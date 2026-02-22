@@ -220,7 +220,7 @@ def _label_to_master_option(option_map: Dict[str, str], label: str) -> Optional[
     if label not in option_map:
         return None
     url = option_map[label]
-    match = re.search(r"([a-dA-D])\.png(?:\?|$)", url)
+    match = re.search(r"([a-dA-D])(?:v\d+)?\.png(?:\?|$)", url)
     if not match:
         return None
     return match.group(1).upper()
