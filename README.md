@@ -44,8 +44,9 @@ uv run python main.py \
 Drop two files in `sample/` for the subject (one answer key + one question paper), then run:
 
 ```bash
+# For Computer Science Set 2
 uv run python main.py \
-  --subject-code CS26 \
+  --subject-code CS26S2 \
   --response-sheet "https://...candidate_response_sheet.html"
 ```
 
@@ -58,6 +59,7 @@ uv run python main.py \
 ```
 
 By default, the script scans `sample/`. You can override with `--sample-dir`.
+Please contribute more sample PDFs for different subjects and sets!
 
 ## CLI Arguments
 
