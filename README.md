@@ -20,6 +20,8 @@ uv sync
 
 ## Usage
 
+### Mode 1: Direct file paths
+
 ```bash
 uv run python main.py \
   --answer-key G26XXXX-CS26SXXXXXXXX-answerKey.pdf \
@@ -37,12 +39,38 @@ uv run python main.py \
   --detailed
 ```
 
+### Mode 2: Subject code auto-discovery from `sample/`
+
+Drop two files in `sample/` for the subject (one answer key + one question paper), then run:
+
+```bash
+uv run python main.py \
+  --subject-code CS26 \
+  --response-sheet "https://...candidate_response_sheet.html"
+```
+
+For Data Science, for example:
+
+```bash
+uv run python main.py \
+  --subject-code DA26 \
+  --response-sheet "https://...candidate_response_sheet.html"
+```
+
+By default, the script scans `sample/`. You can override with `--sample-dir`.
+
 ## CLI Arguments
 
-- `--answer-key` (required): path to master answer key PDF
-- `--question-paper` (required): path to master question paper PDF
+- `--answer-key`: path to master answer key PDF
+- `--question-paper`: path to master question paper PDF
+- `--subject-code`: subject code like `CS26` / `DA26`; auto-picks matching PDFs from `sample/`
+- `--sample-dir`: directory used with `--subject-code` (default: `sample`)
 - `--response-sheet` (required): candidate response sheet URL
 - `--detailed` (optional): print per-question breakdown (CSV-like rows)
+
+You must provide either:
+- `--subject-code`, or
+- both `--answer-key` and `--question-paper`
 
 ## What the script does
 
@@ -62,3 +90,5 @@ uv run python main.py \
 ## Notes
 
 - If the response sheet URL is private/expired, fetching may fail.
+- In `--subject-code` mode, filenames are matched case-insensitively by subject code + `answerKey` / `questionPaper`.
+- If multiple PDFs match the same subject and type, the script throws an error and asks for explicit files.

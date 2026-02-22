@@ -324,6 +324,53 @@ def fetch_response_html(url: str) -> str:
     return response.text
 
 
+def _filename_token(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def _find_subject_pdf(sample_dir: Path, subject_code: str, required_token: str) -> Path:
+    if not sample_dir.exists() or not sample_dir.is_dir():
+        raise ValueError(f"Sample directory does not exist: {sample_dir}")
+
+    normalized_subject = _filename_token(subject_code)
+    candidates: List[Path] = []
+    for pdf_path in sample_dir.glob("*.pdf"):
+        token = _filename_token(pdf_path.name)
+        if normalized_subject in token and required_token in token:
+            candidates.append(pdf_path)
+
+    if not candidates:
+        raise ValueError(
+            f"No PDF found in {sample_dir} for subject code '{subject_code}' and type '{required_token}'."
+        )
+    if len(candidates) > 1:
+        candidate_names = ", ".join(path.name for path in sorted(candidates))
+        raise ValueError(
+            f"Multiple PDFs matched in {sample_dir} for subject code '{subject_code}' and type '{required_token}': "
+            f"{candidate_names}. Keep only one matching file or pass explicit --answer-key/--question-paper."
+        )
+    return candidates[0]
+
+
+def resolve_input_pdfs(
+    answer_key_pdf: Optional[Path],
+    question_paper_pdf: Optional[Path],
+    subject_code: Optional[str],
+    sample_dir: Path,
+) -> Tuple[Path, Path]:
+    if subject_code:
+        resolved_answer_key = _find_subject_pdf(sample_dir, subject_code, "answerkey")
+        resolved_question_paper = _find_subject_pdf(sample_dir, subject_code, "questionpaper")
+        return resolved_answer_key, resolved_question_paper
+
+    if not answer_key_pdf or not question_paper_pdf:
+        raise ValueError(
+            "Provide either --subject-code (for auto-discovery in sample folder) or both --answer-key and --question-paper."
+        )
+
+    return answer_key_pdf, question_paper_pdf
+
+
 def run(
     answer_key_pdf: Path,
     question_paper_pdf: Path,
@@ -349,8 +396,18 @@ def run(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="GATE Marks Calculator")
-    parser.add_argument("--answer-key", required=True, type=Path, help="Path to master answer key PDF")
-    parser.add_argument("--question-paper", required=True, type=Path, help="Path to master question paper PDF")
+    parser.add_argument("--answer-key", type=Path, help="Path to master answer key PDF")
+    parser.add_argument("--question-paper", type=Path, help="Path to master question paper PDF")
+    parser.add_argument(
+        "--subject-code",
+        help="Subject code like CS26/DA26. If provided, PDFs are auto-picked from --sample-dir.",
+    )
+    parser.add_argument(
+        "--sample-dir",
+        type=Path,
+        default=Path("sample"),
+        help="Directory to scan for PDFs when using --subject-code (default: sample)",
+    )
     parser.add_argument("--response-sheet", required=True, help="URL of candidate response sheet")
     parser.add_argument("--detailed", action="store_true", help="Print per-question breakdown")
     return parser
@@ -359,9 +416,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
+
+    try:
+        answer_key_pdf, question_paper_pdf = resolve_input_pdfs(
+            answer_key_pdf=args.answer_key,
+            question_paper_pdf=args.question_paper,
+            subject_code=args.subject_code,
+            sample_dir=args.sample_dir,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+
     run(
-        answer_key_pdf=args.answer_key,
-        question_paper_pdf=args.question_paper,
+        answer_key_pdf=answer_key_pdf,
+        question_paper_pdf=question_paper_pdf,
         response_sheet_url=args.response_sheet,
         detailed=args.detailed,
     )
