@@ -90,7 +90,7 @@ def _mark_word_to_value(word: str) -> Optional[float]:
 def parse_mark_scheme(question_paper_pdf: Path, total_questions: int) -> Dict[int, float]:
     marks: Dict[int, float] = {}
     pattern = re.compile(
-        r"Q\.\s*(\d+)\s*[–-]\s*Q\.\s*(\d+)\s*Carry\s*(ONE|TWO)\s*mark\s*Each",
+        r"Q\.\s*(\d+)\s*(?:[–-]|to)\s*Q\.\s*(\d+)\s*Carry\s*(ONE|TWO)\s*marks?\s*Each",
         re.IGNORECASE,
     )
 
