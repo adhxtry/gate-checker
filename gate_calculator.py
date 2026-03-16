@@ -46,6 +46,26 @@ def normalize_space(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
+def _compact_cells(cells: List[Optional[str]]) -> List[str]:
+    compacted: List[str] = []
+    for cell in cells:
+        text = normalize_space(cell or "")
+        if text:
+            compacted.append(text)
+    return compacted
+
+
+def _header_token(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", value.lower())
+
+
+def _find_col_index(header_tokens: List[str], candidates: Tuple[str, ...]) -> Optional[int]:
+    for idx, token in enumerate(header_tokens):
+        if any(candidate in token for candidate in candidates):
+            return idx
+    return None
+
+
 def parse_answer_key(answer_key_pdf: Path) -> List[AnswerKeyEntry]:
     entries: List[AnswerKeyEntry] = []
     with pdfplumber.open(answer_key_pdf) as pdf:
@@ -53,18 +73,37 @@ def parse_answer_key(answer_key_pdf: Path) -> List[AnswerKeyEntry]:
             for table in page.extract_tables() or []:
                 if not table or len(table) < 2:
                     continue
-                header = [normalize_space(cell or "") for cell in table[0]]
-                if len(header) < 4 or "Q. No." not in header[0] or "Q. Type" not in header[1]:
+
+                header = _compact_cells(table[0])
+                if len(header) < 4:
                     continue
+
+                header_tokens = [_header_token(value) for value in header]
+                q_no_idx = _find_col_index(header_tokens, ("qno", "questionno"))
+                q_type_idx = _find_col_index(header_tokens, ("qtype", "questiontype"))
+                section_idx = _find_col_index(header_tokens, ("section",))
+                key_idx = _find_col_index(header_tokens, ("keyrange", "answerkey", "key"))
+                if q_no_idx is None or q_type_idx is None or section_idx is None or key_idx is None:
+                    continue
+
+                max_required_idx = max(q_no_idx, q_type_idx, section_idx, key_idx)
+
                 for row in table[1:]:
-                    if not row or len(row) < 4:
+                    if not row:
                         continue
-                    q_no_txt = normalize_space(row[0] or "")
-                    q_type = normalize_space(row[1] or "")
-                    section = normalize_space(row[2] or "")
-                    key_raw = normalize_space(row[3] or "")
+
+                    compact_row = _compact_cells(row)
+                    if len(compact_row) <= max_required_idx:
+                        continue
+
+                    q_no_txt = compact_row[q_no_idx]
+                    q_type = compact_row[q_type_idx]
+                    section = compact_row[section_idx]
+                    key_raw = compact_row[key_idx]
+
                     if not q_no_txt.isdigit():
                         continue
+
                     entries.append(
                         AnswerKeyEntry(
                             q_no=int(q_no_txt),
